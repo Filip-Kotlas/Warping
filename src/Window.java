@@ -234,7 +234,7 @@ public class Window extends JFrame
     // Ukáže okno pro uložení upraveného obrázku.
     private void safeImage()
     {
-        if( edited_image.image == null )
+        if( edited_image.image_data == null )
         {
             JOptionPane.showMessageDialog(null, "Není načten žádný obrázek.\nNelze nic uložit.", "Varování", JOptionPane.INFORMATION_MESSAGE );
             return;
@@ -381,7 +381,7 @@ public class Window extends JFrame
             {
                 ImagePanel panel = (ImagePanel) source;
 
-                if( panel.image == null )
+                if( panel.image_data == null )
                 {
                     return;
                 }

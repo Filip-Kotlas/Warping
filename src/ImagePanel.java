@@ -6,7 +6,10 @@ import java.util.Random;
 
 class ImagePanel extends JPanel
 {
-    public BufferedImage image;     // samotný obrázek
+    public BufferedImage image; // samotný obrázek
+    public int[][] image_data;     // data z obrázku
+    public int image_width;     // šířka obrázku v paměti
+    public int image_height;    // výška obrázku v paměti
     public ArrayList<Line> lines = new ArrayList<>();   // list úseček
     public ImagePanel other_panel;  // odkaz na druhý panel
     public boolean lines_visible;   // flag pro viditelnost úseček
@@ -22,16 +25,14 @@ class ImagePanel extends JPanel
 
     public ImagePanel()
     {
-        this.image = null;
+        this.image_data = null;
         this.lines.clear();
         lines_visible = true;
     }
 
     public ImagePanel( BufferedImage image )
     {
-        this.image = image;
-        this.lines.clear();
-        lines_visible = true;
+        loadImage(image);
     }
 
     public void addSecondPanel( ImagePanel secondPanel )
@@ -39,9 +40,19 @@ class ImagePanel extends JPanel
         other_panel = secondPanel;
     }
 
-    public void loadImage( BufferedImage image )
+    public void loadImage( BufferedImage _image )
     {
-        this.image = image;
+        image = _image;
+        image_width = _image.getWidth();
+        image_height = _image.getHeight();
+        image_data = new int[image_width][image_height];
+        for( int i = 0; i < image_width; i++ )
+        {
+            for( int j = 0; j < image_height; j++ )
+            {
+                image_data[i][j] = _image.getRGB(i, j);
+            }
+        }
         this.lines.clear();
         lines_visible = true;
     }
@@ -50,7 +61,7 @@ class ImagePanel extends JPanel
     @Override
     protected void paintComponent(Graphics g)
     {
-        if( this.image != null )
+        if( this.image_data != null )
         {
             setBackground( UIManager.getColor("InternalFrame.background") );
             super.paintComponent(g);
@@ -61,7 +72,7 @@ class ImagePanel extends JPanel
             int panel_width = getWidth();
             int panel_height = getHeight();
             double panel_ratio = (double) panel_width / panel_height;
-            double image_ratio = (double) image.getWidth() / image.getHeight();
+            double image_ratio = (double) image_width / image_height;
 
             // V závislosti na aktuálních rozměrech panelu určuje rozměry a umístění obrázku v panelu.
             // Umísťuje obrázek doprostřed panelu v největší možné velikosti.
@@ -87,7 +98,7 @@ class ImagePanel extends JPanel
             {
                 for( Line line : lines )
                 {
-                    line.repaint( g2d, image_beginning, drawn_image_dim.width / (double) this.image.getWidth() );
+                    line.repaint( g2d, image_beginning, drawn_image_dim.width / (double) this.image_width );
                 }
             }
 
@@ -97,6 +108,17 @@ class ImagePanel extends JPanel
         {
             setBackground( Color.LIGHT_GRAY );
             super.paintComponent(g);
+        }
+    }
+
+    private void updateImage()
+    {
+        for( int i = 0; i < image_width; i++ )
+        {
+            for( int j = 0; j < image_height; j++ )
+            {
+                image.setRGB(i, j, image_data[i][j]);
+            }
         }
     }
 
@@ -176,7 +198,7 @@ class ImagePanel extends JPanel
         Point mouse_position = this.convert_to_image_size( mouse_pos );
         edited_line_index = -1;
         edited_point_index = -1;
-        float min_distance = (float) ( trigger_distance / drawn_image_dim.getWidth() * this.image.getWidth() );
+        float min_distance = (float) ( trigger_distance / drawn_image_dim.getWidth() * this.image_width );
 
         // Prochází všechny existující úsečky.
         for( int i = 0; i < lines.size(); i++ )
@@ -184,7 +206,7 @@ class ImagePanel extends JPanel
             Line line = lines.get(i);
 
             // Kontroluje počáteční bod úsečky.
-            if( Line.areClose( line.p1, mouse_position, trigger_distance / drawn_image_dim.getWidth() * this.image.getWidth() ) )
+            if( Line.areClose( line.p1, mouse_position, trigger_distance / drawn_image_dim.getWidth() * this.image_width ) )
             {
                 double distance = new Line( line.p1, mouse_position ).length();
                 if( distance < min_distance )
@@ -197,7 +219,7 @@ class ImagePanel extends JPanel
             }
 
             // Kontroluje konečný bod úsečky.
-            if( Line.areClose( line.p2, mouse_position, trigger_distance / drawn_image_dim.getWidth() * this.image.getWidth() ) )
+            if( Line.areClose( line.p2, mouse_position, trigger_distance / drawn_image_dim.getWidth() * this.image_width ) )
             {
                 double distance = new Line( line.p2, mouse_position ).length();
                 if( distance < min_distance )
@@ -216,8 +238,8 @@ class ImagePanel extends JPanel
     private Point convert_to_image_size( Point screen_point )
     {
         Point image_point = new Point();
-        image_point.x = (int) ( ( screen_point.x - image_beginning.x ) / this.drawn_image_dim.getWidth() * this.image.getWidth() );
-        image_point.y = (int) ( ( screen_point.y - image_beginning.y ) / this.drawn_image_dim.getWidth() * this.image.getWidth() );
+        image_point.x = (int) ( ( screen_point.x - image_beginning.x ) / this.drawn_image_dim.getWidth() * this.image_width );
+        image_point.y = (int) ( ( screen_point.y - image_beginning.y ) / this.drawn_image_dim.getWidth() * this.image_width );
         return image_point;
     }
 
@@ -249,7 +271,7 @@ class ImagePanel extends JPanel
     {
         int index_of_line_to_delete = -1;
         float trigger_distance = 10;
-        float min_distance = (float) (trigger_distance / drawn_image_dim.getWidth() * this.image.getWidth() ); // Přepočítání do souřadnic obrázku.
+        float min_distance = (float) (trigger_distance / drawn_image_dim.getWidth() * this.image_width ); // Přepočítání do souřadnic obrázku.
         Point mouse_position = this.convert_to_image_size( mouse_pos ); // Přepočítání do souřadnic spojených s obrázkem.
 
         // Prochází všechny úsečky.
@@ -258,8 +280,8 @@ class ImagePanel extends JPanel
             Line line = lines.get(i);
 
             // Kontroluje vzdálenost obou krajních bodů k myši.
-            if( Line.areClose( line.p1, mouse_position, trigger_distance / drawn_image_dim.getWidth() * this.image.getWidth() ) ||
-                Line.areClose( line.p2, mouse_position, trigger_distance / drawn_image_dim.getWidth() * this.image.getWidth() ) )
+            if( Line.areClose( line.p1, mouse_position, trigger_distance / drawn_image_dim.getWidth() * this.image_width ) ||
+                Line.areClose( line.p2, mouse_position, trigger_distance / drawn_image_dim.getWidth() * this.image_width ) )
             {
                 // Ukládá index úsečky k vymazání, pokud se jedná o zatím nejbližší úsečku.
                 float distance1 = new Line( line.p1, convert_to_image_size(mouse_pos) ).length();
@@ -291,68 +313,53 @@ class ImagePanel extends JPanel
     public void warp(float a, float b, float p, boolean use_bilinear )
     {
         // Vypíše zprávu, že nebyl načten obrázek.
-        if( this.image == null )
+        if( this.image_data == null )
         {
             JOptionPane.showMessageDialog(null, "Nejprve načtěte obrázek.", "Chybí obrázek.", JOptionPane.INFORMATION_MESSAGE );
             return;
         }
 
-        // Provede algoritmus
-        for( int i = 0; i < this.image.getWidth(); i++ )
+        //TODO: Dodělat.
+        /*
+        if( antialiasing)
         {
-            for( int j = 0; j < this.image.getHeight(); j++ )
-            {
-                FloatPoint displacement_sum = new FloatPoint(0, 0);
-                float weight_sum = 0.0f;
-                FloatPoint X = new FloatPoint( i, j );
-                FloatPoint X_prime = new FloatPoint();
-                for( int k = 0; k < lines.size(); k++  )
-                {
-                    Line line = lines.get(k);
-                    float u = computeU( X, line.p1, line.p2 );
-                    float v = computeV( X, line.p1, line.p2 );
-                    FloatPoint X_i_prime = computeXPrime(u, v, this.other_panel.lines.get(k).p1, this.other_panel.lines.get(k).p2 );
-                    FloatPoint displacement = X_i_prime.subtract( X );
-                    float dist = distanceToLine(X, line, u, v);
-                    float weight = (float) Math.pow( Math.pow( line.length(), p) / ( a + dist ) , b);
-                    displacement_sum.add( displacement.times( weight ) );
-                    weight_sum += weight;
-                }
 
-                // Pokud nejsou uložené žádné úsečky, výsledný pixel má být stejný jako zdrojový.
-                if( !lines.isEmpty() )
-                {
-                    X_prime = X.plus( displacement_sum.over( weight_sum ) );
-                }
-                else
-                {
-                    X_prime = X;
-                }
+        }
+        */
+
+        // Provede algoritmus
+        for( int i = 0; i < this.image_width; i++ )
+        {
+            for( int j = 0; j < this.image_height; j++ )
+            {
+                FloatPoint X_prime = new FloatPoint();
+                X_prime = computeXPrime(i, j, a, b, p);
 
                 // Pokud je zrojový bod v obrázku vrátí odpovídající barvu pixelu, jinak vrátí černou.
-                if( X_prime.x <= this.image.getWidth() - 1 &&
+                if( X_prime.x <= this.image_width - 1 &&
                     X_prime.x >= 0 &&
-                    X_prime.y <= this.image.getHeight() - 1 &&
+                    X_prime.y <= this.image_height - 1 &&
                     X_prime.y >= 0 )
                 {
                     // Použití bilineární interpolace, pokud je nastaveno její použití.
                     if( use_bilinear )
                     {
-                        this.image.setRGB( i, j, bilinear_interpolation( X_prime.x, X_prime.y ) );
+                        this.image_data[i][j] = bilinear_interpolation( X_prime.x, X_prime.y );
                     }
                     else
                     {
-                        this.image.setRGB( i, j, this.other_panel.image.getRGB( Math.round( X_prime.x ), Math.round( X_prime.y ) ) );
+                        this.image_data[i][j] = this.other_panel.image_data[ Math.round( X_prime.x ) ][ Math.round( X_prime.y ) ];
                     }
                 }
                 else
                 {
-                    this.image.setRGB(i, j, Color.BLACK.getRGB() );
+                    this.image_data[i][j] = Color.BLACK.getRGB();
                 }
             }
         }
+        updateImage();
     }
-
+    //TODO: Je potřeba přepsat funkce pro U, V a možná i X_i_prime pro potřeby antialiasingu, tj. přidat 1/2 na správné místo.
     // Pomocná funkce, pro výpočet proměné u
     private float computeU( FloatPoint X, Point P, Point Q )
     {
@@ -369,8 +376,8 @@ class ImagePanel extends JPanel
         return num / dom;
     }
 
-    // Pomocná funkce, pro výpočet proměné X_prime
-    private FloatPoint computeXPrime( float u, float v, Point P_prime, Point Q_prime )
+    // Pomocná funkce, pro výpočet proměné X_i_prime
+    private FloatPoint computeXiPrime( float u, float v, Point P_prime, Point Q_prime )
     {
         FloatPoint X_prime = new FloatPoint();
         float norm = (float) Math.sqrt( Math.pow( Q_prime.x - P_prime.x, 2) + Math.pow( Q_prime.y - P_prime.y, 2) );
@@ -382,29 +389,51 @@ class ImagePanel extends JPanel
     // Pomocná funkce, pro výpočet vzdálenosti bodu od úsečky.
     private float distanceToLine( FloatPoint X, Line line, float u, float v )
     {
-        float distance = 0;
         if (u < 0)
         {
-            distance = X.distanceToPoint(line.p1);
+            return X.distanceToPoint(line.p1);
         }
-        else if (u > 1)
+        if (u > 1)
         {
-            distance = X.distanceToPoint(line.p2);
+            return X.distanceToPoint(line.p2);
         }
-        else
+        return Math.abs(v);
+    }
+
+    // Vrátí X_prime pro dané i a j.
+    private FloatPoint computeXPrime( int i, int j, float a, float b, float p)
+    {
+        // Pokud nejsou uložené žádné úsečky, výsledný bod má být stejný jako zdrojový.
+        if( lines.isEmpty() )
         {
-            distance = Math.abs(v);
+            return new FloatPoint( i, j );
         }
-        return distance;
+
+        FloatPoint displacement_sum = new FloatPoint(0, 0);
+        float weight_sum = 0.0f;
+        FloatPoint X = new FloatPoint( i, j );
+        for( int k = 0; k < lines.size(); k++  )
+        {
+            Line line = lines.get(k);
+            float u = computeU( X, line.p1, line.p2 );
+            float v = computeV( X, line.p1, line.p2 );
+            FloatPoint X_i_prime = computeXiPrime(u, v, this.other_panel.lines.get(k).p1, this.other_panel.lines.get(k).p2 );
+            FloatPoint displacement = X_i_prime.subtract( X );
+            float dist = distanceToLine(X, line, u, v);
+            float weight = (float) Math.pow( Math.pow( line.length(), p) / ( a + dist ) , b);
+            displacement_sum.add( displacement.times( weight ) );
+            weight_sum += weight;
+        }
+        return X.plus( displacement_sum.over( weight_sum ) );
     }
 
     // Implementace bilineární interpolace.
     private int bilinear_interpolation( float x , float y )
     {
-        float x0 = (float) Math.floor( x );
-        float x1 = (float) Math.ceil( x );
-        float y0 = (float) Math.floor( y );
-        float y1 = (float) Math.ceil( y );
+        int x0 = Math.round( (float) Math.floor( x ) );
+        int x1 = Math.round( (float) Math.ceil( x ) );
+        int y0 = Math.round( (float) Math.floor( y ) );
+        int y1 = Math.round( (float) Math.ceil( y ) );
 
         int[] f00 = new int[3];
         int[] f10 = new int[3];
@@ -415,36 +444,49 @@ class ImagePanel extends JPanel
         int fx1[] = new int[3];
         int fxy[] = new int[3];
 
+        f00[0] = getRed( this.other_panel.image_data[x0][y0] );
+        f10[0] = getRed( this.other_panel.image_data[x1][y0] );
+        f01[0] = getRed( this.other_panel.image_data[x0][y1] );
+        f11[0] = getRed( this.other_panel.image_data[x1][y1] );
+
+        f00[1] = getGreen( this.other_panel.image_data[x0][y0] );
+        f10[1] = getGreen( this.other_panel.image_data[x1][y0] );
+        f01[1] = getGreen( this.other_panel.image_data[x0][y1] );
+        f11[1] = getGreen( this.other_panel.image_data[x1][y1] );
+
+        f00[2] = getBlue( this.other_panel.image_data[x0][y0] );
+        f10[2] = getBlue( this.other_panel.image_data[x1][y0] );
+        f01[2] = getBlue( this.other_panel.image_data[x0][y1] );
+        f11[2] = getBlue( this.other_panel.image_data[x1][y1] );
+
         for( int i = 0; i < 3; i++)
-        {
-            f00[i] = adapter_index_to_color_chanel( new Color( this.other_panel.image.getRGB( (int) x0, (int) y0 ) ), i);
-            f10[i] = adapter_index_to_color_chanel( new Color( this.other_panel.image.getRGB( (int) x1, (int) y0 ) ), i);
-            f01[i] = adapter_index_to_color_chanel( new Color( this.other_panel.image.getRGB( (int) x0, (int) y1 ) ), i);
-            f11[i] = adapter_index_to_color_chanel( new Color( this.other_panel.image.getRGB( (int) x1, (int) y1 ) ), i);
-            
+        {          
             fx0[i] = f00[i] + (int) ( ( x - x0 ) * ( f10[i] - f00[i] ) );
             fx1[i] = f01[i] + (int) ( ( x - x0 ) * ( f11[i] - f01[i] ) );
             fxy[i] = fx0[i] + (int) ( ( y - y0 ) * ( fx1[i] - fx0[i] ) );
         }
 
-        return new Color( fxy[0], fxy[1], fxy[2] ).getRGB();
+        return getRGB( fxy[0], fxy[1], fxy[2] );
     }
 
-    // Pomocná metoda, která pomohla rychle napravit chybu.
-    // Vrací hodnotu barevného kanálu zadané barvy, který je vybrán pomocí indexu.
-    private int adapter_index_to_color_chanel( Color c, int i )
+    private int getRed( int RGB )
     {
-        switch (i)
-        {
-            case 0:
-                return c.getRed();
-            case 1:
-                return c.getGreen();
-            case 2:
-                return c.getBlue();
-            default:
-                throw new IllegalArgumentException();
-        }
+        return (RGB >> 16) & 0xFF;
+    }
+
+    private int getGreen( int RGB )
+    {
+        return (RGB >> 8) & 0xFF;
+    }
+
+    private int getBlue( int RGB )
+    {
+        return (RGB >> 0) & 0xFF;
+    }
+
+    private int getRGB( int Red, int Green, int Blue )
+    {
+        return new Color( Red, Green, Blue ).getRGB();
     }
 
     // Pomocná třída bodu se souřadnicemi typu float
