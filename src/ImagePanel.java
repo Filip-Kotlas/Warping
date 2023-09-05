@@ -310,7 +310,7 @@ class ImagePanel extends JPanel
     }
 
     // Provede warping tohoto obrázku.
-    public void warp(float a, float b, float p, boolean use_bilinear )
+    public void warp(float a, float b, float p, float integration_step, boolean use_bilinear, boolean use_antialiasing )
     {
         // Vypíše zprávu, že nebyl načten obrázek.
         if( this.image_data == null )
@@ -319,13 +319,47 @@ class ImagePanel extends JPanel
             return;
         }
 
-        //TODO: Dodělat.
-        /*
-        if( antialiasing)
+        if( use_antialiasing )
         {
+            FloatPoint[][] X_prime_field = new FloatPoint[image_width + 1][image_height + 1];
+            for( int i = 0; i <= this.image_width; i++ )
+            {
+                for( int j = 0; j <= this.image_height; j++ )
+                {
+                    X_prime_field[i][j] = computeXPrime(new FloatPoint( i - 0.5f, j - 0.5f ), a, b, p);
+                }
+            }
 
+            for( int i = 0; i < this.image_width; i++ )
+            {
+                for( int j = 0; j < this.image_height; j++ )
+                {
+                    FloatPoint[] verticies = {  X_prime_field[ i ][ j ],
+                                                X_prime_field[ i ][ j + 1 ],
+                                                X_prime_field[ i + 1 ][ j + 1 ],
+                                                X_prime_field[ i + 1 ][ j ] };
+                    boolean in_image = true;
+                    for( int k = 0; k < 4; k++ )
+                    {
+                        if( ! isTransformedPointInImage( verticies[k] ) )
+                        {
+                            in_image = false;
+                        }
+                    }
+                    
+                    if( in_image )
+                    {
+                        this.image_data[i][j] = integrateOverPolygon( verticies, integration_step, use_bilinear );
+                    }
+                    else
+                    {
+                        this.image_data[i][j] = Color.BLACK.getRGB();
+                    }
+                }
+            }
+            updateImage();
+            return;
         }
-        */
 
         // Provede algoritmus
         for( int i = 0; i < this.image_width; i++ )
@@ -333,13 +367,10 @@ class ImagePanel extends JPanel
             for( int j = 0; j < this.image_height; j++ )
             {
                 FloatPoint X_prime = new FloatPoint();
-                X_prime = computeXPrime(i, j, a, b, p);
+                X_prime = computeXPrime( new FloatPoint( i, j ), a, b, p );
 
                 // Pokud je zrojový bod v obrázku vrátí odpovídající barvu pixelu, jinak vrátí černou.
-                if( X_prime.x <= this.image_width - 1 &&
-                    X_prime.x >= 0 &&
-                    X_prime.y <= this.image_height - 1 &&
-                    X_prime.y >= 0 )
+                if( isTransformedPointInImage(X_prime) )
                 {
                     // Použití bilineární interpolace, pokud je nastaveno její použití.
                     if( use_bilinear )
@@ -359,7 +390,12 @@ class ImagePanel extends JPanel
         }
         updateImage();
     }
-    //TODO: Je potřeba přepsat funkce pro U, V a možná i X_i_prime pro potřeby antialiasingu, tj. přidat 1/2 na správné místo.
+
+    private boolean isTransformedPointInImage( FloatPoint p )
+    {
+        return p.x <= this.image_width - 1 && p.x >= 0 && p.y <= this.image_height - 1 && p.y >= 0;
+    }
+
     // Pomocná funkce, pro výpočet proměné u
     private float computeU( FloatPoint X, Point P, Point Q )
     {
@@ -401,17 +437,16 @@ class ImagePanel extends JPanel
     }
 
     // Vrátí X_prime pro dané i a j.
-    private FloatPoint computeXPrime( int i, int j, float a, float b, float p)
+    private FloatPoint computeXPrime( FloatPoint X, float a, float b, float p)
     {
         // Pokud nejsou uložené žádné úsečky, výsledný bod má být stejný jako zdrojový.
         if( lines.isEmpty() )
         {
-            return new FloatPoint( i, j );
+            return X;
         }
 
         FloatPoint displacement_sum = new FloatPoint(0, 0);
         float weight_sum = 0.0f;
-        FloatPoint X = new FloatPoint( i, j );
         for( int k = 0; k < lines.size(); k++  )
         {
             Line line = lines.get(k);
@@ -487,6 +522,100 @@ class ImagePanel extends JPanel
     private int getRGB( int Red, int Green, int Blue )
     {
         return new Color( Red, Green, Blue ).getRGB();
+    }
+
+    private int integrateOverPolygon( FloatPoint[] verticies, float step, boolean bilinear)
+    {
+        int color[] = new int[3];
+        for( int i = 0; i < 3; i++ )
+        {
+            color[i] = 0;
+        }
+
+        float lower_bound = verticies[0].y;
+        float upper_bound = verticies[0].y;
+        float left_bound = verticies[0].x;
+        float right_bound = verticies[0].x;
+        
+        for( int i = 1; i < 4; i++ )
+        {
+            lower_bound = Math.min( verticies[i].y, lower_bound );
+            upper_bound = Math.max( verticies[i].y, upper_bound );
+            left_bound = Math.min( verticies[i].x, left_bound );
+            right_bound = Math.max( verticies[i].x, right_bound );
+        }
+
+        FloatPoint[] edge_normal_vectors = new FloatPoint[4];
+        for( int i = 0; i < 4; i++ )
+        {
+            edge_normal_vectors[i] = new FloatPoint(0, 0);
+            edge_normal_vectors[i].x = verticies[ ( i + 1 ) % 4 ].y - verticies[i].y;
+            edge_normal_vectors[i].y = verticies[i].x - verticies[( i + 1 ) % 4 ].x;
+        }
+
+        float mesh_lower_bound = lower_bound - lower_bound % step;
+        float mesh_upper_bound = upper_bound - upper_bound % step + step;
+        float mesh_left_bound = left_bound - left_bound % step;
+        float mesh_right_bound = right_bound - right_bound % step + step;
+        
+        int area_counter = 0;
+        FloatPoint current_point = new FloatPoint(0, 0);
+        boolean is_inside = false;
+        for( int j = 0; mesh_lower_bound + j * step < mesh_upper_bound; j++ )
+        {
+            for( int i = 0; mesh_left_bound + i * step < mesh_right_bound; i++ )
+            {
+                is_inside = true;
+                current_point.x = mesh_left_bound + i * step + step/2;
+                current_point.y = mesh_lower_bound + j * step + step/2;
+
+                for( int k = 0; k < 4; k++ )
+                {
+                    if( edgeFunction(   new FloatPoint( current_point.x, current_point.y ),
+                                        edge_normal_vectors[k],
+                                        verticies[k] )
+                        < 0 )
+                    {
+                        is_inside = false;
+                    }
+                }
+
+                if( is_inside )
+                {
+                    area_counter++;
+                    if( bilinear )
+                    {
+                        color[0] += getRed( bilinear_interpolation( current_point.x, current_point.y ) );
+                        color[1] += getGreen( bilinear_interpolation( current_point.x, current_point.y ) );
+                        color[2] += getBlue( bilinear_interpolation( current_point.x, current_point.y ) );
+                    }
+                    else
+                    {
+                        color[0] += getRed( this.other_panel.image_data[ Math.round( current_point.x ) ][ Math.round( current_point.y ) ] );
+                        color[1] += getGreen( this.other_panel.image_data[ Math.round( current_point.x ) ][ Math.round( current_point.y ) ] );
+                        color[2] += getBlue( this.other_panel.image_data[ Math.round( current_point.x ) ][ Math.round( current_point.y ) ] );
+                    }
+                }
+            }
+        }
+
+        if( area_counter != 0 )
+        {
+            color[0] /= area_counter;
+            color[1] /= area_counter;
+            color[2] /= area_counter;
+        }
+        else
+        {
+            return Color.CYAN.getRGB();
+        }
+
+        return getRGB( color[0], color[1], color[2]);
+    }
+
+    float edgeFunction( FloatPoint point, FloatPoint normal, FloatPoint line_point)
+    {
+        return ( point.x - line_point.x ) * normal.x + (point.y - line_point.y ) * normal.y;
     }
 
     // Pomocná třída bodu se souřadnicemi typu float

@@ -20,6 +20,7 @@ public class Window extends JFrame
     float a = 1;
     float b = 1;
     float p = 1;
+    float integration_step = 0.1f;
 
 
     public Window()
@@ -100,7 +101,8 @@ public class Window extends JFrame
         JMenu warping = new JMenu( "Warping");
         JMenuItem warp = new JMenuItem( "Warping" );
         JMenuItem set_par = new JMenuItem( "Nastavení parametrů");
-        JCheckBoxMenuItem bilinear = new JCheckBoxMenuItem( "Bilineární interpolace", true );
+        JCheckBoxMenuItem bilinear = new JCheckBoxMenuItem( "Bilineární interpolace", false );
+        JCheckBoxMenuItem antialiasing = new JCheckBoxMenuItem("Antialiasing", false );
         JMenu rest = new JMenu( "Ostatní" );
         JCheckBoxMenuItem lines_visible = new JCheckBoxMenuItem( "Čáry", true );
         JMenuItem help = new JMenuItem( "Nápověda" );
@@ -114,6 +116,7 @@ public class Window extends JFrame
         warping.add( warp );
         warping.add( set_par );
         warping.add( bilinear );
+        warping.add( antialiasing );
         window_bar.add( rest );
         rest.add( lines_visible );
         rest.add( help );
@@ -152,8 +155,8 @@ public class Window extends JFrame
                                     @Override
                                     public void actionPerformed( ActionEvent e )
                                     {
-                                        edited_image.warp( a, b, p, bilinear.getState() );
-                                        edited_image.repaint();
+                                        edited_image.warp( a, b, p, integration_step, bilinear.getState(), antialiasing.getState() );
+                                        //edited_image.repaint();
                                     }
                                 } );
         bilinear.addActionListener( new ActionListener()
@@ -161,8 +164,15 @@ public class Window extends JFrame
                                         @Override
                                         public void actionPerformed( ActionEvent e )
                                         {
-                                            edited_image.warp( a, b, p, bilinear.getState() );
-                                            edited_image.repaint();
+                                            //edited_image.repaint();
+                                        }
+                                    } );
+        antialiasing.addActionListener( new ActionListener()
+                                    {
+                                        @Override
+                                        public void actionPerformed( ActionEvent e )
+                                        {
+                                            //edited_image.repaint();
                                         }
                                     } );
         set_par.addActionListener(  new ActionListener()
@@ -203,6 +213,7 @@ public class Window extends JFrame
         lines_visible.setAccelerator(KeyStroke.getKeyStroke( KeyEvent.VK_L, modifier ) );
         warp.setAccelerator( KeyStroke.getKeyStroke( KeyEvent.VK_ENTER, modifier ) );
         bilinear.setAccelerator( KeyStroke.getKeyStroke( KeyEvent.VK_B, modifier ) );
+        antialiasing.setAccelerator( KeyStroke.getKeyStroke( KeyEvent.VK_A, modifier ) );
         set_par.setAccelerator( KeyStroke.getKeyStroke( KeyEvent.VK_N, modifier ) );
         help.setAccelerator( KeyStroke.getKeyStroke( KeyEvent.VK_H, modifier ) );
     }
@@ -304,25 +315,31 @@ public class Window extends JFrame
         JPanel horizontal_wrapper1 = new JPanel();
         JPanel horizontal_wrapper2 = new JPanel();
         JPanel horizontal_wrapper3 = new JPanel();
+        JPanel horizontal_wrapper4 = new JPanel();
 
         horizontal_wrapper1.setLayout( new BoxLayout( horizontal_wrapper1, BoxLayout.X_AXIS ) );
         horizontal_wrapper2.setLayout( new BoxLayout( horizontal_wrapper2, BoxLayout.X_AXIS ) );
         horizontal_wrapper3.setLayout( new BoxLayout( horizontal_wrapper3, BoxLayout.X_AXIS ) );
+        horizontal_wrapper4.setLayout( new BoxLayout( horizontal_wrapper4, BoxLayout.X_AXIS ) );
 
         JTextField text_field1 = new JTextField(null, Float.toString( a ),  10 );
         JTextField text_field2 = new JTextField(null, Float.toString( b ), 10 );
         JTextField text_field3 = new JTextField(null, Float.toString( p ), 10 );
+        JTextField text_field4 = new JTextField(null, Float.toString( integration_step ), 10 );
 
         horizontal_wrapper1.add( new JLabel( "a: " ) );
         horizontal_wrapper2.add( new JLabel( "b: " ) );
         horizontal_wrapper3.add( new JLabel( "p: " ) );
+        horizontal_wrapper4.add( new JLabel( "krok integrace: " ) );
         horizontal_wrapper1.add( text_field1 );
         horizontal_wrapper2.add( text_field2 );
         horizontal_wrapper3.add( text_field3 );
+        horizontal_wrapper4.add( text_field4 );
 
         main_panel.add( horizontal_wrapper1 );
         main_panel.add( horizontal_wrapper2 );
         main_panel.add( horizontal_wrapper3 );
+        main_panel.add( horizontal_wrapper4 );
 
         int result = JOptionPane.showConfirmDialog(null, main_panel, "Zadejte hodnoty", JOptionPane.OK_CANCEL_OPTION);
 
@@ -332,11 +349,14 @@ public class Window extends JFrame
                 a = Float.parseFloat( text_field1.getText() );
                 b = Float.parseFloat( text_field2.getText() );
                 p = Float.parseFloat( text_field3.getText() );
+                integration_step = Float.parseFloat( text_field4.getText() );
 
-                if( a < 0 || b < 0 || p < 0 )
-                    throw new IllegalArgumentException();
+                if( a < 0 || b < 0 || p < 0 || integration_step < 0)
+                    throw new IllegalArgumentException("Chyba: Zadávejte pouze nezáporná čísla!");
+                if( integration_step > 1 )
+                    throw new IllegalArgumentException( "Chyba: Krok integrace nemůže být větší než 1.");
             } catch( IllegalArgumentException e) {
-                JOptionPane.showMessageDialog(null, "Chyba: Zadávejte pouze nezáporná čísla!", "Varování", JOptionPane.WARNING_MESSAGE );
+                JOptionPane.showMessageDialog(null, e.getMessage(), "Varování", JOptionPane.WARNING_MESSAGE );
             }
         }
     }
