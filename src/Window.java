@@ -20,7 +20,7 @@ public class Window extends JFrame
     float a = 1;
     float b = 1;
     float p = 1;
-    float integration_step = 0.1f;
+    //float integration_step = 0.1f;
 
 
     public Window()
@@ -155,26 +155,9 @@ public class Window extends JFrame
                                     @Override
                                     public void actionPerformed( ActionEvent e )
                                     {
-                                        edited_image.warp( a, b, p, integration_step, bilinear.getState(), antialiasing.getState() );
-                                        //edited_image.repaint();
+                                        edited_image.warp( a, b, p, 0.1f/*integration_step*/, bilinear.getState(), antialiasing.getState() );
                                     }
                                 } );
-        bilinear.addActionListener( new ActionListener()
-                                    {
-                                        @Override
-                                        public void actionPerformed( ActionEvent e )
-                                        {
-                                            //edited_image.repaint();
-                                        }
-                                    } );
-        antialiasing.addActionListener( new ActionListener()
-                                    {
-                                        @Override
-                                        public void actionPerformed( ActionEvent e )
-                                        {
-                                            //edited_image.repaint();
-                                        }
-                                    } );
         set_par.addActionListener(  new ActionListener()
                                     {
                                         @Override
@@ -315,31 +298,31 @@ public class Window extends JFrame
         JPanel horizontal_wrapper1 = new JPanel();
         JPanel horizontal_wrapper2 = new JPanel();
         JPanel horizontal_wrapper3 = new JPanel();
-        JPanel horizontal_wrapper4 = new JPanel();
+        //JPanel horizontal_wrapper4 = new JPanel();
 
         horizontal_wrapper1.setLayout( new BoxLayout( horizontal_wrapper1, BoxLayout.X_AXIS ) );
         horizontal_wrapper2.setLayout( new BoxLayout( horizontal_wrapper2, BoxLayout.X_AXIS ) );
         horizontal_wrapper3.setLayout( new BoxLayout( horizontal_wrapper3, BoxLayout.X_AXIS ) );
-        horizontal_wrapper4.setLayout( new BoxLayout( horizontal_wrapper4, BoxLayout.X_AXIS ) );
+        //horizontal_wrapper4.setLayout( new BoxLayout( horizontal_wrapper4, BoxLayout.X_AXIS ) );
 
         JTextField text_field1 = new JTextField(null, Float.toString( a ),  10 );
         JTextField text_field2 = new JTextField(null, Float.toString( b ), 10 );
         JTextField text_field3 = new JTextField(null, Float.toString( p ), 10 );
-        JTextField text_field4 = new JTextField(null, Float.toString( integration_step ), 10 );
+        //JTextField text_field4 = new JTextField(null, Float.toString( integration_step ), 10 );
 
         horizontal_wrapper1.add( new JLabel( "a: " ) );
         horizontal_wrapper2.add( new JLabel( "b: " ) );
         horizontal_wrapper3.add( new JLabel( "p: " ) );
-        horizontal_wrapper4.add( new JLabel( "krok integrace: " ) );
+        //horizontal_wrapper4.add( new JLabel( "krok integrace: " ) );
         horizontal_wrapper1.add( text_field1 );
         horizontal_wrapper2.add( text_field2 );
         horizontal_wrapper3.add( text_field3 );
-        horizontal_wrapper4.add( text_field4 );
+        //horizontal_wrapper4.add( text_field4 );
 
         main_panel.add( horizontal_wrapper1 );
         main_panel.add( horizontal_wrapper2 );
         main_panel.add( horizontal_wrapper3 );
-        main_panel.add( horizontal_wrapper4 );
+        //main_panel.add( horizontal_wrapper4 );
 
         int result = JOptionPane.showConfirmDialog(null, main_panel, "Zadejte hodnoty", JOptionPane.OK_CANCEL_OPTION);
 
@@ -349,12 +332,12 @@ public class Window extends JFrame
                 a = Float.parseFloat( text_field1.getText() );
                 b = Float.parseFloat( text_field2.getText() );
                 p = Float.parseFloat( text_field3.getText() );
-                integration_step = Float.parseFloat( text_field4.getText() );
+                //integration_step = Float.parseFloat( text_field4.getText() );
 
-                if( a < 0 || b < 0 || p < 0 || integration_step < 0)
+                if( a < 0 || b < 0 || p < 0 )//|| integration_step < 0)
                     throw new IllegalArgumentException("Chyba: Zadávejte pouze nezáporná čísla!");
-                if( integration_step > 1 )
-                    throw new IllegalArgumentException( "Chyba: Krok integrace nemůže být větší než 1.");
+                //if( integration_step > 1 )
+                //    throw new IllegalArgumentException( "Chyba: Krok integrace nemůže být větší než 1.");
             } catch( IllegalArgumentException e) {
                 JOptionPane.showMessageDialog(null, e.getMessage(), "Varování", JOptionPane.WARNING_MESSAGE );
             }

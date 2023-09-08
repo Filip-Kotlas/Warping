@@ -3,6 +3,7 @@ import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;
 import java.util.Random;
+import java.util.*;
 
 class ImagePanel extends JPanel
 {
@@ -40,6 +41,7 @@ class ImagePanel extends JPanel
         other_panel = secondPanel;
     }
 
+    // Načte data z obrázku.
     public void loadImage( BufferedImage _image )
     {
         image = _image;
@@ -111,6 +113,7 @@ class ImagePanel extends JPanel
         }
     }
 
+    // Překleslí data do obrázku složícího k vykreslování.
     private void updateImage()
     {
         for( int i = 0; i < image_width; i++ )
@@ -309,7 +312,7 @@ class ImagePanel extends JPanel
         this.repaint();
     }
 
-    // Provede warping tohoto obrázku.
+    // Provede warping tohoto obrázku zvolenou metodou.
     public void warp(float a, float b, float p, float integration_step, boolean use_bilinear, boolean use_antialiasing )
     {
         // Vypíše zprávu, že nebyl načten obrázek.
@@ -321,54 +324,65 @@ class ImagePanel extends JPanel
 
         if( use_antialiasing )
         {
-            FloatPoint[][] X_prime_field = new FloatPoint[image_width + 1][image_height + 1];
-            for( int i = 0; i <= this.image_width; i++ )
-            {
-                for( int j = 0; j <= this.image_height; j++ )
-                {
-                    X_prime_field[i][j] = computeXPrime(new FloatPoint( i - 0.5f, j - 0.5f ), a, b, p);
-                }
-            }
-
-            for( int i = 0; i < this.image_width; i++ )
-            {
-                for( int j = 0; j < this.image_height; j++ )
-                {
-                    FloatPoint[] verticies = {  X_prime_field[ i ][ j ],
-                                                X_prime_field[ i ][ j + 1 ],
-                                                X_prime_field[ i + 1 ][ j + 1 ],
-                                                X_prime_field[ i + 1 ][ j ] };
-                    boolean in_image = true;
-                    for( int k = 0; k < 4; k++ )
-                    {
-                        if( ! isTransformedPointInImage( verticies[k] ) )
-                        {
-                            in_image = false;
-                        }
-                    }
-                    
-                    if( in_image )
-                    {
-                        this.image_data[i][j] = integrateOverPolygon( verticies, integration_step, use_bilinear );
-                    }
-                    else
-                    {
-                        this.image_data[i][j] = Color.BLACK.getRGB();
-                    }
-                }
-            }
-            updateImage();
-            return;
+            antialiasingWarp(a, b, p, integration_step, use_bilinear);
         }
+        else
+        {
+            normalWarp(a, b, p, use_bilinear);
+        }
+    }
+    
+    // Provede warping s antialiasingem.
+    private void antialiasingWarp( float a, float b, float p, float integration_step, boolean use_bilinear )
+    {
+        // Napočítá souřadnice rohů pixelů.
+        FloatPoint[][] X_prime_field = new FloatPoint[image_width + 1][image_height + 1];
+        for( int i = 0; i <= this.image_width; i++ )
+        {
+            for( int j = 0; j <= this.image_height; j++ )
+            {
+                X_prime_field[i][j] = computeXPrime(new FloatPoint( i - 0.5f, j - 0.5f ), a, b, p);
+            }
+        }
+    
+        // Iteruje přes všechny pixely a zavolá funkci, která přes jejich obraz integruje.
+        for( int i = 0; i < this.image_width; i++ )
+        {
+            for( int j = 0; j < this.image_height; j++ )
+            {
+                FloatPoint[] verticies = {  X_prime_field[ i ][ j ],
+                                            X_prime_field[ i ][ j + 1 ],
+                                            X_prime_field[ i + 1 ][ j + 1 ],
+                                            X_prime_field[ i + 1 ][ j ] };
 
-        // Provede algoritmus
+                boolean in_image =  isTransformedPointInImage( verticies[0] ) || 
+                                    isTransformedPointInImage( verticies[1] ) ||
+                                    isTransformedPointInImage( verticies[2] ) ||
+                                    isTransformedPointInImage( verticies[3] );
+                
+                if( in_image )
+                {
+                    this.image_data[i][j] = integrateOverPolygon( verticies, integration_step, use_bilinear );
+                }
+                else
+                {
+                    this.image_data[i][j] = Color.BLACK.getRGB();
+                }
+            }
+        }
+        updateImage();
+    }
+
+    // Provede warping bez antialiasingu.
+    private void normalWarp( float a, float b, float p, boolean use_bilinear )
+    {
         for( int i = 0; i < this.image_width; i++ )
         {
             for( int j = 0; j < this.image_height; j++ )
             {
                 FloatPoint X_prime = new FloatPoint();
                 X_prime = computeXPrime( new FloatPoint( i, j ), a, b, p );
-
+    
                 // Pokud je zrojový bod v obrázku vrátí odpovídající barvu pixelu, jinak vrátí černou.
                 if( isTransformedPointInImage(X_prime) )
                 {
@@ -391,11 +405,12 @@ class ImagePanel extends JPanel
         updateImage();
     }
 
+    // Vrátí true, pokud je bod v obrázku.
     private boolean isTransformedPointInImage( FloatPoint p )
     {
         return p.x <= this.image_width - 1 && p.x >= 0 && p.y <= this.image_height - 1 && p.y >= 0;
     }
-
+    
     // Pomocná funkce, pro výpočet proměné u
     private float computeU( FloatPoint X, Point P, Point Q )
     {
@@ -522,9 +537,10 @@ class ImagePanel extends JPanel
     private int getRGB( int Red, int Green, int Blue )
     {
         return new Color( Red, Green, Blue ).getRGB();
-    }
+    } 
 
-    private int integrateOverPolygon( FloatPoint[] verticies, float step, boolean bilinear)
+    // Integruje přes zadaný čtyřúhelník.
+    int integrateOverPolygon( FloatPoint[] verticies, float step, boolean bilinear )
     {
         int color[] = new int[3];
         for( int i = 0; i < 3; i++ )
@@ -535,71 +551,104 @@ class ImagePanel extends JPanel
         float lower_bound = verticies[0].y;
         float upper_bound = verticies[0].y;
         float left_bound = verticies[0].x;
-        float right_bound = verticies[0].x;
+        //float right_bound = verticies[0].x;
         
+        // Výpočet mezí čtyřúhelníku
         for( int i = 1; i < 4; i++ )
         {
             lower_bound = Math.min( verticies[i].y, lower_bound );
             upper_bound = Math.max( verticies[i].y, upper_bound );
             left_bound = Math.min( verticies[i].x, left_bound );
-            right_bound = Math.max( verticies[i].x, right_bound );
+            //right_bound = Math.max( verticies[i].x, right_bound );
         }
 
-        FloatPoint[] edge_normal_vectors = new FloatPoint[4];
+        // Výpočet směrových vektorů hran.
+        FloatPoint[] edge_directional_vectors = new FloatPoint[4];
         for( int i = 0; i < 4; i++ )
         {
-            edge_normal_vectors[i] = new FloatPoint(0, 0);
-            edge_normal_vectors[i].x = verticies[ ( i + 1 ) % 4 ].y - verticies[i].y;
-            edge_normal_vectors[i].y = verticies[i].x - verticies[( i + 1 ) % 4 ].x;
+            edge_directional_vectors[i] = new FloatPoint(0, 0);
+            edge_directional_vectors[i].x = verticies[( i + 1 ) % 4 ].x - verticies[i].x;
+            edge_directional_vectors[i].y =  verticies[ ( i + 1 ) % 4 ].y - verticies[i].y;
         }
 
+        // Přemočet mezí na body sítě.
         float mesh_lower_bound = lower_bound - lower_bound % step;
         float mesh_upper_bound = upper_bound - upper_bound % step + step;
         float mesh_left_bound = left_bound - left_bound % step;
-        float mesh_right_bound = right_bound - right_bound % step + step;
+        //float mesh_right_bound = right_bound - right_bound % step + step;
         
+        // Iteruje přes řádky a integruje.
         int area_counter = 0;
         FloatPoint current_point = new FloatPoint(0, 0);
         boolean is_inside = false;
         for( int j = 0; mesh_lower_bound + j * step < mesh_upper_bound; j++ )
         {
-            for( int i = 0; mesh_left_bound + i * step < mesh_right_bound; i++ )
+            // Výpočet průsečíků a jejich seřazení
+            ArrayList<Float> intersections = new ArrayList<Float>();
+            float parameter = 0;
+            for( int k = 0; k < 4; k++ )
             {
-                is_inside = true;
-                current_point.x = mesh_left_bound + i * step + step/2;
-                current_point.y = mesh_lower_bound + j * step + step/2;
-
-                for( int k = 0; k < 4; k++ )
+                parameter = ( mesh_lower_bound + j * step + step/2 - verticies[k].y ) / edge_directional_vectors[k].y;
+                if( parameter < 1 && parameter > 0 )
                 {
-                    if( edgeFunction(   new FloatPoint( current_point.x, current_point.y ),
-                                        edge_normal_vectors[k],
-                                        verticies[k] )
-                        < 0 )
-                    {
-                        is_inside = false;
-                    }
+                    intersections.add( verticies[k].x + parameter * edge_directional_vectors[k].x );
                 }
+            }
+            Collections.sort( intersections );
 
-                if( is_inside )
+            // Pokud nejsou na řádku, žádné průsečíky pokračuje na další řádek.
+            if( intersections.isEmpty() || intersections.size() % 2 == 1 )
+            {
+                continue;
+            }
+            
+            // Iteruje přes průsečíky a podle toho, jesli je uvnitř čtyřúhelníku nebo ne, přičítá barvu.
+            for( int k = 0; k < intersections.size(); k++ )
+            {
+                if( !is_inside )
                 {
-                    area_counter++;
-                    if( bilinear )
+                    // Určení startu nasčítávání.
+                    float current_intersection = intersections.get(k);
+                    int start = (int) Math.round( Math.floor( ( current_intersection - mesh_left_bound ) / step ) );
+                    if( mesh_left_bound + start * step + step / 2 < current_intersection )
                     {
-                        color[0] += getRed( bilinear_interpolation( current_point.x, current_point.y ) );
-                        color[1] += getGreen( bilinear_interpolation( current_point.x, current_point.y ) );
-                        color[2] += getBlue( bilinear_interpolation( current_point.x, current_point.y ) );
+                        start++;
                     }
-                    else
+                    
+                    // Nasčítání barev mezi dvěma průsečíky.
+                    for( int i = start; mesh_left_bound + i * step + step / 2 < intersections.get(k+1); i++ )
                     {
-                        color[0] += getRed( this.other_panel.image_data[ Math.round( current_point.x ) ][ Math.round( current_point.y ) ] );
-                        color[1] += getGreen( this.other_panel.image_data[ Math.round( current_point.x ) ][ Math.round( current_point.y ) ] );
-                        color[2] += getBlue( this.other_panel.image_data[ Math.round( current_point.x ) ][ Math.round( current_point.y ) ] );
+                        current_point.x = mesh_left_bound + i * step + step/2;
+                        current_point.y = mesh_lower_bound + j * step + step/2;
+
+                        if( isTransformedPointInImage( current_point ) )
+                        {
+                            area_counter++;
+                            if( bilinear )
+                            {
+                                color[0] += getRed( bilinear_interpolation( current_point.x, current_point.y ) );
+                                color[1] += getGreen( bilinear_interpolation( current_point.x, current_point.y ) );
+                                color[2] += getBlue( bilinear_interpolation( current_point.x, current_point.y ) );
+                            }
+                            else
+                            {
+                                color[0] += getRed( this.other_panel.image_data[ Math.round( current_point.x ) ][ Math.round( current_point.y ) ] );
+                                color[1] += getGreen( this.other_panel.image_data[ Math.round( current_point.x ) ][ Math.round( current_point.y ) ] );
+                                color[2] += getBlue( this.other_panel.image_data[ Math.round( current_point.x ) ][ Math.round( current_point.y ) ] );
+                            }
+                        }
                     }
+                    is_inside = true;
+                }
+                else
+                {
+                    is_inside = false;
                 }
             }
         }
 
-        if( area_counter != 0 )
+        // Pokud je čtyřúhelník příliš deformovaný a krok integrace je tak příliš velký provede integraci s dvojnásobnou přesností.
+        if( area_counter >= 30 )
         {
             color[0] /= area_counter;
             color[1] /= area_counter;
@@ -607,16 +656,12 @@ class ImagePanel extends JPanel
         }
         else
         {
-            return Color.CYAN.getRGB();
+            return integrateOverPolygon(verticies, step / 2, bilinear);
         }
 
         return getRGB( color[0], color[1], color[2]);
     }
 
-    float edgeFunction( FloatPoint point, FloatPoint normal, FloatPoint line_point)
-    {
-        return ( point.x - line_point.x ) * normal.x + (point.y - line_point.y ) * normal.y;
-    }
 
     // Pomocná třída bodu se souřadnicemi typu float
     class FloatPoint
