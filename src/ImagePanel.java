@@ -718,3 +718,4 @@ class ImagePanel extends JPanel
         public float y;
     }
 }
+
